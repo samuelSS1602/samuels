@@ -14,7 +14,7 @@ export default function Project3DVisual({ type }) {
     ai: "/assets/projects/agri.png",
     iot: "/assets/projects/iot.png",
     food: "/assets/projects/nutri.png",
-    pricewatch: "./assets/projects/ecom.png",
+    pricewatch: "/assets/projects/ecom.png",
     crime: "/assets/projects/crime.png"
   };
 

@@ -728,6 +728,15 @@ body {
   margin-bottom: 40px;
 }
 
+@media (max-width: 600px) {
+  .project-sticky-wrap {
+    top: auto !important;
+    position: relative !important;
+    height: auto !important;
+    margin-bottom: 24px;
+  }
+}
+
 .project-card {
   height: 100%;
   background: var(--bg-card);

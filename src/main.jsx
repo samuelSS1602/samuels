@@ -377,8 +377,20 @@ function Skills() {
 }
 
 function ProjectCard({ project, index }) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 600);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
-    <div className="project-sticky-wrap" style={{ top: `${index * 32 + 100}px` }}>
+    <div
+      className="project-sticky-wrap"
+      style={{ top: isMobile ? "auto" : `${index * 32 + 100}px` }}
+    >
       <article className="project-card" data-cursor="PROJECT">
         <div className="project-header">
           <span className="project-index">{project.no}</span>
