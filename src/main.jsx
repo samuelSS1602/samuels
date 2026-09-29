@@ -12,6 +12,9 @@ import Sparkles from "lucide-react/dist/esm/icons/sparkles.js";
 import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2.js";
 import Copy from "lucide-react/dist/esm/icons/copy.js";
 import ArrowUp from "lucide-react/dist/esm/icons/arrow-up.js";
+import Menu from "lucide-react/dist/esm/icons/menu.js";
+import X from "lucide-react/dist/esm/icons/x.js";
+import Mail from "lucide-react/dist/esm/icons/mail.js";
 import CustomCursor from "./components/CustomCursor.jsx";
 import Project3DVisual from "./components/Project3DVisual.jsx";
 import "./styles.css";
@@ -116,7 +119,85 @@ const stats = [
   { value: "60FPS", label: "WebGL Smoothness" }
 ];
 
-function FadeIn({ children, delay = 0, y = 35, x = 0, className = "" }) {
+const isTouchDevice = () => window.matchMedia("(hover: none), (pointer: coarse)").matches;
+
+const haptic = (pattern = 8) => {
+  if (isTouchDevice() && navigator.vibrate) navigator.vibrate(pattern);
+};
+
+// Adds .in-focus while the element crosses the middle band of the viewport.
+// Touch screens have no hover, so this drives the "hover" styles while scrolling.
+function useInFocus(ref, enabled = true) {
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !enabled) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      element.classList.toggle("in-focus", entry.isIntersecting);
+    }, { rootMargin: "-48% 0px -48% 0px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref, enabled]);
+}
+
+// Material-style ripple + light haptic on every tap of a link/button (touch only)
+function useTapFeedback() {
+  useEffect(() => {
+    const handleDown = (event) => {
+      if (event.pointerType === "mouse") return;
+      const target = event.target.closest("a, button");
+      if (!target || target.closest(".mobile-menu, .scroll-cue")) return;
+
+      const rect = target.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height) * 2;
+      const ripple = document.createElement("span");
+      ripple.className = "tap-ripple";
+      ripple.style.width = ripple.style.height = `${size}px`;
+      ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
+      ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
+      target.classList.add("has-ripple");
+      target.appendChild(ripple);
+      ripple.addEventListener("animationend", () => ripple.remove());
+      haptic(8);
+    };
+    document.addEventListener("pointerdown", handleDown, { passive: true });
+    return () => document.removeEventListener("pointerdown", handleDown);
+  }, []);
+}
+
+function CountUp({ value }) {
+  const ref = useRef(null);
+  const match = value.match(/^(\d+)(.*)$/);
+  const [display, setDisplay] = useState(match ? `${"0".repeat(match[1].length)}${match[2]}` : value);
+
+  useEffect(() => {
+    if (!match) return;
+    const element = ref.current;
+    const target = Number(match[1]);
+    const digits = match[1].length;
+    let frame;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
+      const start = performance.now();
+      const step = (now) => {
+        const t = Math.min(1, (now - start) / 1400);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setDisplay(`${String(Math.round(target * eased)).padStart(digits, "0")}${match[2]}`);
+        if (t < 1) frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    }, { threshold: 0.6 });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [value]);
+
+  return <span ref={ref} className="stat-value">{display}</span>;
+}
+
+function FadeIn({ children, delay = 0, y = 35, x = 0, className = "", focus = false }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -133,6 +214,8 @@ function FadeIn({ children, delay = 0, y = 35, x = 0, className = "" }) {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  useInFocus(ref, focus);
 
   return (
     <div
@@ -155,29 +238,76 @@ function Magnetic({ children }) {
   );
 }
 
+const navItems = [
+  { id: "about", label: "ABOUT", cursor: "VIEW" },
+  { id: "skills", label: "SKILLS", cursor: "VIEW" },
+  { id: "projects", label: "PROJECTS", cursor: "VIEW" },
+  { id: "contact", label: "CONTACT", cursor: "HELLO" }
+];
+
 function Header() {
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [active, setActive] = useState("");
+  const progressRef = useRef(null);
 
   useEffect(() => {
+    let frame = 0;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 40);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        setScrolled(window.scrollY > 40);
+        if (progressRef.current) {
+          progressRef.current.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`;
+        }
+      });
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) setActive(entry.target.id);
+      });
+    }, { rootMargin: "-45% 0px -50% 0px" });
+
+    ["home", ...navItems.map((item) => item.id)].forEach((id) => {
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("menu-open", menuOpen);
+    const handleKey = (e) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [menuOpen]);
+
+  const closeMenu = () => setMenuOpen(false);
+
   return (
-    <header className={`nav-header ${scrolled ? "is-scrolled" : ""}`}>
+    <header className={`nav-header ${scrolled ? "is-scrolled" : ""} ${menuOpen ? "is-menu-open" : ""}`}>
+      <div className="scroll-progress" ref={progressRef} />
       <nav className="nav-container">
-        <a href="#home" className="brand-logo" data-cursor="SAMUEL">
+        <a href="#home" className="brand-logo" data-cursor="SAMUEL" onClick={closeMenu}>
           SAMUEL<span>.</span>
         </a>
 
         <div className="nav-links">
-          <a href="#about" data-cursor="VIEW">ABOUT</a>
-          <a href="#skills" data-cursor="VIEW">SKILLS</a>
-          <a href="#projects" data-cursor="VIEW">PROJECTS</a>
-          <a href="#contact" data-cursor="HELLO">CONTACT</a>
+          {navItems.map((item) => (
+            <a key={item.id} href={`#${item.id}`} data-cursor={item.cursor} className={active === item.id ? "is-active" : ""}>
+              {item.label}
+            </a>
+          ))}
         </div>
 
         <div className="nav-right">
@@ -191,31 +321,124 @@ function Header() {
           <a className="nav-social-icon" href={profile.linkedin} target="_blank" rel="noreferrer" aria-label="LinkedIn profile" data-cursor="LINKEDIN">
             <Linkedin size={19} />
           </a>
+          <button
+            type="button"
+            className="menu-toggle"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </nav>
+
+      <div id="mobile-menu" className={`mobile-menu ${menuOpen ? "is-open" : ""}`} aria-hidden={!menuOpen}>
+        {navItems.map((item, i) => (
+          <a
+            key={item.id}
+            href={`#${item.id}`}
+            onClick={closeMenu}
+            tabIndex={menuOpen ? 0 : -1}
+            style={{ "--i": i }}
+            className={active === item.id ? "is-active" : ""}
+          >
+            <span className="mobile-menu-no">0{i + 1}</span>
+            {item.label}
+          </a>
+        ))}
+        <div className="mobile-menu-status">
+          <span className="pulse-dot" />
+          AVAILABLE FOR OPPORTUNITIES
+        </div>
+      </div>
     </header>
   );
 }
 
 function Portrait3D() {
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const depthRef = useRef(null);
+  const boopRef = useRef(null);
+  const [booped, setBooped] = useState(0);
+  const [showHint, setShowHint] = useState(false);
+  const gyroAsked = useRef(false);
+
+  const applyTilt = (x, y) => {
+    if (depthRef.current) {
+      depthRef.current.style.transform = `perspective(900px) rotateX(${x}deg) rotateY(${y}deg)`;
+    }
+  };
 
   const handlePointerMove = (event) => {
     const x = event.clientX / window.innerWidth - 0.5;
     const y = event.clientY / window.innerHeight - 0.5;
-    setTilt({ x: y * -12, y: x * 16 });
+    applyTilt(y * -12, x * 16);
+  };
+
+  const listenToGyro = () => {
+    const handleOrientation = (event) => {
+      if (event.beta == null || event.gamma == null) return;
+      // Phone held upright is ~45° beta; clamp so the avatar never flips too far
+      const x = Math.max(-14, Math.min(14, (event.beta - 45) * -0.35));
+      const y = Math.max(-18, Math.min(18, event.gamma * 0.5));
+      applyTilt(x, y);
+    };
+    window.addEventListener("deviceorientation", handleOrientation, { passive: true });
+    return () => window.removeEventListener("deviceorientation", handleOrientation);
+  };
+
+  useEffect(() => {
+    if (!isTouchDevice()) return;
+    setShowHint(true);
+    const hintTimer = setTimeout(() => setShowHint(false), 6000);
+    // Android exposes orientation without a prompt; iOS needs a tap first (see handleTap)
+    const needsPermission = typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function";
+    const stop = needsPermission ? undefined : listenToGyro();
+    return () => {
+      clearTimeout(hintTimer);
+      stop?.();
+    };
+  }, []);
+
+  const handleTap = async () => {
+    setBooped((n) => n + 1);
+    const boop = boopRef.current;
+    if (boop) {
+      // Restart the bounce animation on every tap
+      boop.classList.remove("is-booped");
+      void boop.offsetWidth;
+      boop.classList.add("is-booped");
+    }
+    setShowHint(false);
+    haptic([12, 40, 12]);
+    if (!gyroAsked.current && typeof DeviceOrientationEvent?.requestPermission === "function") {
+      gyroAsked.current = true;
+      try {
+        if (await DeviceOrientationEvent.requestPermission() === "granted") listenToGyro();
+      } catch {
+        // Permission denied or unavailable, drag-to-tilt still works
+      }
+    }
   };
 
   return (
     <div
       className="hero-portrait-stage hero-portrait-float"
       onPointerMove={handlePointerMove}
-      onPointerLeave={() => setTilt({ x: 0, y: 0 })}
+      onPointerLeave={() => applyTilt(0, 0)}
+      onPointerUp={(event) => event.pointerType !== "mouse" && setTimeout(() => applyTilt(0, 0), 600)}
+      onClick={handleTap}
+      data-cursor="HI!"
     >
-      <div
-        className="hero-portrait-depth"
-        style={{ transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)` }}
-      >
+      {booped > 0 && (
+        <div key={booped} className="boop-burst" aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => <span key={i} style={{ "--a": `${i * 36}deg` }} />)}
+        </div>
+      )}
+      {showHint && <span className="portrait-hint">TAP ME · TILT YOUR PHONE</span>}
+      <div ref={depthRef} className="hero-portrait-depth">
+        <div ref={boopRef} className="portrait-boop">
         <img
           className="hero-main-image"
           src="/assets/branding/3d.webp"
@@ -227,6 +450,7 @@ function Portrait3D() {
           loading="eager"
           alt="Samuel 3D avatar"
         />
+        </div>
       </div>
     </div>
   );
@@ -250,18 +474,30 @@ function Hero() {
         <Portrait3D />
 
         {/* Floating Glass Badges around 3D Canvas */}
-        <div className="floating-pill pill-top-left hero-reveal hero-reveal-left hero-reveal-delay-1">
-          <Code2 size={14} className="pill-icon" /> REACT &amp; WEB DEVELOPMENT
+        {/* Outer element handles the entrance reveal, inner pill handles the idle float */}
+        <div className="pill-anchor pill-top-left hero-reveal hero-reveal-left hero-reveal-delay-1">
+          <div className="floating-pill">
+            <Code2 size={14} className="pill-icon" /> REACT &amp; WEB DEVELOPMENT
+          </div>
         </div>
 
-        <div className="floating-pill pill-top-right hero-reveal hero-reveal-right hero-reveal-delay-2">
-          <Sparkles size={14} className="pill-icon text-red" /> AI &amp; MULTILINGUAL NLP
+        <div className="pill-anchor pill-top-right hero-reveal hero-reveal-right hero-reveal-delay-2">
+          <div className="floating-pill">
+            <Sparkles size={14} className="pill-icon pill-icon-red" /> AI &amp; MULTILINGUAL NLP
+          </div>
         </div>
 
-        <div className="floating-pill pill-bottom-left hero-reveal hero-reveal-up hero-reveal-delay-3">
-          <Cpu size={14} className="pill-icon text-blue" /> IOT &amp; SMART SYSTEMS
+        <div className="pill-anchor pill-bottom-left hero-reveal hero-reveal-up hero-reveal-delay-3">
+          <div className="floating-pill">
+            <Cpu size={14} className="pill-icon pill-icon-blue" /> IOT &amp; SMART SYSTEMS
+          </div>
         </div>
       </div>
+
+      <a href="#about" className="scroll-cue hero-reveal hero-reveal-up hero-reveal-delay-3" aria-label="Scroll to about section" data-cursor="SCROLL">
+        <span className="scroll-cue-mouse"><span /></span>
+        <span className="scroll-cue-text">SCROLL</span>
+      </a>
 
       {/* Hero Bottom Bar */}
       <div className="hero-bottom-bar">
@@ -287,7 +523,14 @@ function Hero() {
 
 function Marquee() {
   return (
-    <section className="marquee-wrapper">
+    <section
+      className="marquee-wrapper"
+      aria-label="Technologies (press and hold to pause)"
+      onPointerDown={(e) => e.currentTarget.classList.add("is-paused")}
+      onPointerUp={(e) => e.currentTarget.classList.remove("is-paused")}
+      onPointerLeave={(e) => e.currentTarget.classList.remove("is-paused")}
+      onPointerCancel={(e) => e.currentTarget.classList.remove("is-paused")}
+    >
       <div className="marquee-track track-forward">
         {[...marqueeItems, ...marqueeItems].map((item, i) => (
           <span key={i} className="marquee-item">
@@ -306,13 +549,43 @@ function Marquee() {
   );
 }
 
-function Word({ word }) {
-  return <span className="about-word">{word} </span>;
+function Word({ word, lit, accent }) {
+  return <span className={`about-word ${lit ? "is-lit" : ""} ${accent ? "is-accent" : ""}`}>{word} </span>;
 }
+
+const accentWords = new Set(["web", "AI", "connected", "real-world"]);
 
 function About() {
   const bioText = "I am a software developer focused on building useful digital products across web development, AI and connected systems. I enjoy turning ideas into responsive interfaces, practical APIs and real-world solutions.";
   const words = bioText.split(" ");
+  const paragraphRef = useRef(null);
+  const [litCount, setLitCount] = useState(0);
+
+  useEffect(() => {
+    // Light up the paragraph word-by-word as it scrolls through the viewport
+    let frame = 0;
+    const update = () => {
+      const el = paragraphRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const start = window.innerHeight * 0.85;
+      const end = window.innerHeight * 0.35;
+      const progress = Math.min(1, Math.max(0, (start - rect.top) / (start - end + rect.height * 0.5)));
+      setLitCount(Math.round(progress * words.length));
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [words.length]);
 
   return (
     <section id="about" className="about-section">
@@ -321,20 +594,20 @@ function About() {
       <div className="ambient-icon icon-bottom-left"><Cpu size={115} /></div>
 
       <FadeIn><span className="section-eyebrow">ABOUT SAMUEL SANTHARAJ S</span></FadeIn>
-      <FadeIn delay={0.1}><h2 className="section-heading text-center">ABOUT ME</h2></FadeIn>
+      <FadeIn delay={0.1}><h2 className="section-heading text-center">ABOUT ME<span className="heading-accent">.</span></h2></FadeIn>
 
       <div className="about-content-box">
-        <p className="about-reveal-paragraph">
-          {words.map((w, i) => {
-            return <Word key={i} word={w} />;
-          })}
+        <p className="about-reveal-paragraph" ref={paragraphRef}>
+          {words.map((w, i) => (
+            <Word key={i} word={w} lit={i < litCount} accent={accentWords.has(w.replace(/[.,]/g, ""))} />
+          ))}
         </p>
 
         {/* Stats Grid */}
         <div className="stats-grid">
           {stats.map((st, idx) => (
             <FadeIn key={st.label} delay={0.15 + idx * 0.08} className="stat-card">
-              <span className="stat-value">{st.value}</span>
+              <CountUp value={st.value} />
               <span className="stat-label">{st.label}</span>
             </FadeIn>
           ))}
@@ -358,16 +631,17 @@ function Skills() {
     <section id="skills" className="skills-section">
       <div className="skills-container">
         <FadeIn><span className="section-eyebrow text-dark">TECHNICAL CAPABILITIES</span></FadeIn>
-        <FadeIn delay={0.1}><h2 className="section-heading text-dark text-center">SKILLS &amp; STACK</h2></FadeIn>
+        <FadeIn delay={0.1}><h2 className="section-heading text-dark text-center">SKILLS &amp; STACK<span className="heading-accent">.</span></h2></FadeIn>
 
         <div className="skills-grid">
           {skills.map(([no, title, desc], i) => (
-            <FadeIn key={no} delay={i * 0.08} className="skill-card-row">
+            <FadeIn key={no} delay={i * 0.08} className="skill-card-row" focus>
               <div className="skill-num">{no}</div>
               <div className="skill-body">
                 <h3>{title}</h3>
                 <p>{desc}</p>
               </div>
+              <ArrowUpRight className="skill-arrow" size={34} strokeWidth={1.6} aria-hidden="true" />
             </FadeIn>
           ))}
         </div>
@@ -378,6 +652,8 @@ function Skills() {
 
 function ProjectCard({ project, index }) {
   const [isMobile, setIsMobile] = useState(false);
+  const cardRef = useRef(null);
+  useInFocus(cardRef);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 600);
@@ -386,12 +662,18 @@ function ProjectCard({ project, index }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const handleSpotlight = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.style.setProperty("--spot-x", `${event.clientX - rect.left}px`);
+    event.currentTarget.style.setProperty("--spot-y", `${event.clientY - rect.top}px`);
+  };
+
   return (
     <div
       className="project-sticky-wrap"
       style={{ top: isMobile ? "auto" : `${index * 32 + 100}px` }}
     >
-      <article className="project-card" data-cursor="PROJECT">
+      <article ref={cardRef} className="project-card" data-cursor="PROJECT" onPointerMove={handleSpotlight}>
         <div className="project-header">
           <span className="project-index">{project.no}</span>
           <div className="project-meta-titles">
@@ -425,7 +707,7 @@ function Projects() {
   return (
     <section id="projects" className="projects-section">
       <FadeIn><span className="section-eyebrow">FEATURED WORK</span></FadeIn>
-      <FadeIn delay={0.1}><h2 className="section-heading text-center mb-12">PROJECTS</h2></FadeIn>
+      <FadeIn delay={0.1}><h2 className="section-heading text-center mb-12">PROJECTS<span className="heading-accent">.</span></h2></FadeIn>
 
       <div className="projects-stack-container">
         {projects.map((p, i) => <ProjectCard key={p.no} project={p} index={i} />)}
@@ -437,9 +719,27 @@ function Projects() {
 function Contact() {
   const [copied, setCopied] = useState(false);
 
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(profile.email);
+  const handleCopyEmail = async () => {
+    try {
+      // navigator.clipboard is undefined on non-HTTPS origins and can reject when permission is denied
+      await navigator.clipboard.writeText(profile.email);
+    } catch {
+      const field = document.createElement("textarea");
+      field.value = profile.email;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      const ok = document.execCommand("copy");
+      field.remove();
+      if (!ok) {
+        window.location.href = `mailto:${profile.email}`;
+        return;
+      }
+    }
     setCopied(true);
+    haptic([10, 50, 20]);
     setTimeout(() => setCopied(false), 2500);
   };
 
@@ -449,6 +749,7 @@ function Contact() {
 
   return (
     <section id="contact" className="contact-fullbleed">
+      <div className="contact-bg-word" aria-hidden="true">HELLO</div>
       <div className="contact-top-row">
         <FadeIn><span className="contact-eyebrow">LET'S BUILD SOMETHING</span></FadeIn>
         <FadeIn delay={0.1}>
@@ -460,12 +761,21 @@ function Contact() {
       </div>
 
       <div className="contact-middle-row">
-        <FadeIn delay={0.25}>
-          <button onClick={handleCopyEmail} className="email-copy-btn" data-cursor="COPY">
-            <span>{profile.email}</span>
-            {copied ? <CheckCircle2 className="text-green-400" size={24} /> : <Copy size={22} />}
-          </button>
-          {copied && <span className="copy-toast">Copied to clipboard!</span>}
+        <FadeIn delay={0.25} className="contact-actions">
+          <div className="email-copy-wrap">
+            <button type="button" onClick={handleCopyEmail} className="email-copy-btn" data-cursor="COPY">
+              <span>{profile.email}</span>
+              {copied ? <CheckCircle2 className="text-green-300" size={24} /> : <Copy size={22} />}
+            </button>
+            <span className={`copy-toast ${copied ? "is-shown" : ""}`} role="status">
+              {copied ? "Copied to clipboard!" : ""}
+            </span>
+          </div>
+          <a href={`mailto:${profile.email}`} className="mail-cta-btn" data-cursor="MAIL">
+            <Mail size={18} />
+            <span>SAY HELLO</span>
+            <ArrowUpRight size={18} />
+          </a>
         </FadeIn>
       </div>
 
@@ -488,7 +798,43 @@ function Contact() {
   );
 }
 
+function FloatingContact() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    // Show after the hero, hide once the contact section is on screen
+    let frame = 0;
+    const update = () => {
+      const contact = document.getElementById("contact");
+      const pastHero = window.scrollY > window.innerHeight * 0.8;
+      const atContact = contact && contact.getBoundingClientRect().top < window.innerHeight * 0.9;
+      setVisible(pastHero && !atContact);
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  return (
+    <div className={`floating-contact ${visible ? "is-visible" : ""}`} aria-hidden={!visible}>
+      <a href="#projects" tabIndex={visible ? 0 : -1}>WORK</a>
+      <a href="#contact" className="floating-contact-main" tabIndex={visible ? 0 : -1}>
+        <span className="pulse-dot" /> LET'S TALK
+      </a>
+    </div>
+  );
+}
+
 function App() {
+  useTapFeedback();
+
   return (
     <div className="jack-portfolio-app">
       <CustomCursor />
@@ -501,6 +847,7 @@ function App() {
         <Projects />
         <Contact />
       </main>
+      <FloatingContact />
     </div>
   );
 }
