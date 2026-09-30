@@ -6,9 +6,11 @@ import Utensils from "lucide-react/dist/esm/icons/utensils.js";
 import ShoppingCart from "lucide-react/dist/esm/icons/shopping-cart.js";
 import ShieldCheck from "lucide-react/dist/esm/icons/shield-check.js";
 import Sparkles from "lucide-react/dist/esm/icons/sparkles.js";
+import Mic from "lucide-react/dist/esm/icons/mic.js";
 
 export default function Project3DVisual({ type }) {
   const images = {
+    speakup: "/assets/projects/speakup.webp",
     spp: "/assets/projects/Sri.png",
     hotel: "/assets/projects/lodge.png",
     ai: "/assets/projects/agri.png",
@@ -19,6 +21,7 @@ export default function Project3DVisual({ type }) {
   };
 
   const labels = {
+    speakup: "NICE SPEAKUP — AI SPEAKING COACH FOR KIDS",
     spp: "SRI PADMAVATI PLEASANTS — WEB PLATFORM",
     hotel: "LODGE MANAGEMENT — GUEST CRM DASHBOARD",
     ai: "AGRI-AI — MULTILINGUAL VOICE & VISION",
@@ -29,6 +32,7 @@ export default function Project3DVisual({ type }) {
   };
 
   const icons = {
+    speakup: Mic,
     hotel: Globe2,
     ai: BrainCircuit,
     iot: Cpu,

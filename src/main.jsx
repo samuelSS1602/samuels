@@ -28,27 +28,35 @@ const profile = {
 
 const projects = [
   {
-    no: "01",
+    category: "AI / EDTECH",
+    title: "Nice SpeakUp",
+    description: "AI speaking coach for children aged 6–12 that builds communication and soft skills through voice-first conversations with Pip, games and learning missions — with XP, streaks and parent & teacher insights.",
+    stack: ["React", "Vite", "Tailwind CSS", "Voice AI", "Vercel"],
+    link: "https://testnice-silk.vercel.app/",
+    live: true,
+    visual: "speakup"
+  },
+  {
     category: "WEB / BUSINESS",
     title: "Sri Padmavati Pleasants",
     description: "Responsive business website with room listings, booking inquiry and contact flows, built for performance, SEO and cross-device usability.",
     stack: ["React", "Node.js", "Firebase", "GCP"],
     link: "https://www.sripadmavatipleasants.com/",
+    live: true,
     repo: "https://github.com/samuelSS1602/SPP",
     visual: "spp"
   },
   {
-    no: "02",
     category: "WEB / LODGE MANAGEMENT",
     title: "Lodge Management & Guest CRM",
     description: "Centralized lodge operations dashboard for managing reservations, rooms, guests, check-ins, check-outs, billing and day-to-day operational records.",
     stack: ["React", "Node.js", "Firebase", "GCP"],
     link: "https://spp-admin-alpha.vercel.app/",
+    live: true,
     repo: "https://github.com/samuelSS1602/SPP-ADMIN",
     visual: "hotel"
   },
   {
-    no: "03",
     category: "AI / AGRITECH",
     title: "AGRI-AI Assistant",
     description: "Voice-enabled agricultural assistant combining speech, text and images with multilingual AI for crop guidance, weather information and plant-disease support.",
@@ -58,7 +66,6 @@ const projects = [
     visual: "ai"
   },
   {
-    no: "04",
     category: "IOT / SMART CITY",
     title: "Smart Garbage Management",
     description: "IoT-based monitoring and vehicle allocation concept using sensor data, Firebase and a web dashboard to improve waste collection efficiency.",
@@ -68,7 +75,6 @@ const projects = [
     visual: "iot"
   },
   {
-    no: "05",
     category: "AI / HEALTH & NUTRITION",
     title: "NutriEats",
     description: "Nutrition-focused food application designed to help users discover meals and make healthier food choices through a focused, accessible experience.",
@@ -78,7 +84,6 @@ const projects = [
     visual: "food"
   },
   {
-    no: "06",
     category: "WEB / E-COMMERCE",
     title: "PriceWatch",
     description: "Web-based price comparison and tracking platform that compares products across stores, shows historical price trends and sends alerts when products reach a target price.",
@@ -88,7 +93,6 @@ const projects = [
     visual: "pricewatch"
   },
   {
-    no: "07",
     category: "WEB / CIVIC TECH",
     title: "CrimeRegistry",
     description: "Web-based crime reporting and complaint management system for citizen registration, online complaint filing, case tracking and police case administration.",
@@ -97,7 +101,7 @@ const projects = [
     repo: "https://github.com/samuelSS1602/CRIME-REPORTING-SYSTEM",
     visual: "crime"
   }
-];
+].map((project, i) => ({ ...project, no: String(i + 1).padStart(2, "0") }));
 
 const skills = [
   ["01", "Frontend Engineering", "React.js, JavaScript, responsive interfaces, Three.js animations, and modern component-driven UI."],
@@ -113,7 +117,7 @@ const marqueeItems = [
 ];
 
 const stats = [
-  { value: "07", label: "Featured Projects" },
+  { value: String(projects.length).padStart(2, "0"), label: "Featured Projects" },
   { value: "03+", label: "Specializations" },
   { value: "100%", label: "SEO & Usability" },
   { value: "60FPS", label: "WebGL Smoothness" }
@@ -681,7 +685,7 @@ function ProjectCard({ project, index }) {
             <h3 className="project-title">{project.title}</h3>
           </div>
           <a href={project.link} target="_blank" rel="noreferrer" className="live-demo-link" data-cursor="VIEW">
-            <span>{project.no === "01" || project.no === "02" ? "VIEW LIVE PROJECT" : "VIEW ON GITHUB"}</span> <ExternalLink size={15} />
+            <span>{project.live ? "VIEW LIVE PROJECT" : "VIEW ON GITHUB"}</span> <ExternalLink size={15} />
           </a>
         </div>
 
@@ -691,9 +695,11 @@ function ProjectCard({ project, index }) {
             <div className="tech-tags-list">
               {project.stack.map(s => <span key={s} className="tech-tag">{s}</span>)}
             </div>
-            <a href={project.repo} target="_blank" rel="noreferrer" className="repo-code-link" data-cursor="CODE">
-              <Github size={16} /> VIEW SOURCE CODE
-            </a>
+            {project.repo && (
+              <a href={project.repo} target="_blank" rel="noreferrer" className="repo-code-link" data-cursor="CODE">
+                <Github size={16} /> VIEW SOURCE CODE
+              </a>
+            )}
           </div>
 
           <Project3DVisual type={project.visual} />
